@@ -1,0 +1,15 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: oidc-auth
+config:
+  issuer: https://login.microsoftonline.com/1bb2f6a0-65a6-4526-8470-3288e926fc0a/v2.0
+  scopes: [ "7c4e9069-cacd-4134-91b4-a78bded95ef9/.default" ]
+  verify_claims: false
+  client_id:
+  - 7c4e9069-cacd-4134-91b4-a78bded95ef9
+  client_secret:
+  - "$(kubectl get secret oidc-secret -n kong -o jsonpath='{.data.OIDC_CLIENT_SECRET}' | base64 --decode)"
+  redirect_uri:
+  - https://<KONG EXTERNAL IP>.nip.io/
+plugin: openid-connect
