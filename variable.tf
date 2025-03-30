@@ -20,7 +20,7 @@ variable "aks_name" {
 
 variable "aoai_name" {
   description = "Azure OpenAI Service name"
-  default     = "kong-aoai-test4"
+  default     = "kong-aoai-test5"
 }
 
 variable "vnet_name" {
