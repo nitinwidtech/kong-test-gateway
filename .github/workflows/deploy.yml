@@ -58,8 +58,8 @@ jobs:
           az aks get-credentials --resource-group kong-ai-gateway --name kong-aks
       - name: Get AOAI Credentials and Create Secret
         run: |
-          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test9 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
-          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test9 -g kong-ai-gateway --query 'key1' -o tsv)
+          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test10 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
+          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test10 -g kong-ai-gateway --query 'key1' -o tsv)
           kubectl create secret generic aoai --from-literal=OPENAI_API_KEY=$AOAI_KEY --from-literal=OPENAI_ENDPOINT=https://openai-internal-service || true
       - name: Ensure TLS Certificates Exist
         run: |
