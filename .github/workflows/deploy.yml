@@ -59,8 +59,8 @@ jobs:
 
       - name: Get AOAI Credentials and Create Secret
         run: |
-          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test5 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
-          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test5 -g kong-ai-gateway --query 'key1' -o tsv)
+          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test6 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
+          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test6 -g kong-ai-gateway --query 'key1' -o tsv)
 
           kubectl create secret generic aoai --from-literal=OPENAI_API_KEY=$AOAI_KEY --from-literal=OPENAI_ENDPOINT=https://openai-internal-service || true
 
@@ -76,11 +76,17 @@ jobs:
           kubectl create namespace kong || true
           helm repo add kong https://charts.konghq.com
           helm repo update
+          
           kubectl create secret tls konnect-client-tls -n kong \
             --cert=./tls.crt --key=./tls.key
 
           echo "Installing Kong..."
-          helm upgrade --install kong kong/ingress -n kong --values k8s/values.yaml --wait
+          helm upgrade --install kong kong/ingress -n kong --values k8s/values.yaml \
+            --set env.plugins="bundled,openid-connect" --wait
+
+          echo "Checking if openid-connect plugin is enabled..."
+          kubectl get pods -n kong
+          kubectl exec -n kong -it $(kubectl get pods -n kong -l app.kubernetes.io/name=kong -o jsonpath='{.items[0].metadata.name}') -- kong config db_export | grep openid-connect || echo "OIDC plugin not enabled!"
 
       - name: Debug Kong Installation
         run: |
