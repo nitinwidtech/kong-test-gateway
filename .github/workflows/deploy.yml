@@ -59,9 +59,9 @@ jobs:
 
       - name: Get AOAI Credentials and Create Secret
         run: |
-          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test3 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
-          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test3 -g kong-ai-gateway --query 'key1' -o tsv)
-          
+          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test4 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
+          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test4 -g kong-ai-gateway --query 'key1' -o tsv)
+
           kubectl create secret generic aoai --from-literal=OPENAI_API_KEY=$AOAI_KEY --from-literal=OPENAI_ENDPOINT=https://openai-internal-service
 
       - name: Ensure TLS Certificates Exist
@@ -78,17 +78,29 @@ jobs:
           helm repo update
           kubectl create secret tls konnect-client-tls -n kong \
             --cert=./tls.crt --key=./tls.key
-          helm install kong kong/ingress -n kong --values k8s/values.yaml
+
+          # Ensure Kong is installed before checking IP
+          echo "Installing Kong..."
+          helm upgrade --install kong kong/ingress -n kong --values k8s/values.yaml --wait
+
+      - name: Debug Kong Installation
+        run: |
+          echo "Checking Kong resources..."
+          kubectl get all -n kong
+          echo "Describing Kong services..."
+          kubectl describe svc -n kong kong-proxy || echo "kong-proxy service not found!"
+          echo "Fetching Kong logs..."
+          kubectl logs -n kong -l app.kubernetes.io/name=kong --tail=50 || echo "No logs found!"
 
       - name: Wait for Kong External IP
         run: |
           echo "Waiting for Kong external IP..."
-          while [[ -z $(kubectl get svc -n kong kong-proxy -o jsonpath='{.status.loadBalancer.ingress[0].ip}') ]]; do
+          while [[ -z $(kubectl get svc -n kong --ignore-not-found -o jsonpath='{.items[?(@.metadata.name=="kong-proxy")].status.loadBalancer.ingress[0].ip}') ]]; do
             echo "Waiting for external IP..."
-            sleep 10
+            sleep 30
           done
 
-          KONG_EXTERNAL_IP=$(kubectl get svc -n kong kong-proxy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          KONG_EXTERNAL_IP=$(kubectl get svc -n kong -o jsonpath='{.items[?(@.metadata.name=="kong-proxy")].status.loadBalancer.ingress[0].ip}')
           echo "Kong External IP: $KONG_EXTERNAL_IP"
 
           # Update kong-plugin-oidc-test.yaml with correct External IP
