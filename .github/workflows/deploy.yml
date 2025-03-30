@@ -59,8 +59,8 @@ jobs:
 
       - name: Get AOAI Credentials and Create Secret
         run: |
-          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test6 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
-          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test6 -g kong-ai-gateway --query 'key1' -o tsv)
+          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test7 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
+          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test7 -g kong-ai-gateway --query 'key1' -o tsv)
 
           kubectl create secret generic aoai --from-literal=OPENAI_API_KEY=$AOAI_KEY --from-literal=OPENAI_ENDPOINT=https://openai-internal-service || true
 
@@ -82,7 +82,7 @@ jobs:
 
           echo "Installing Kong..."
           helm upgrade --install kong kong/ingress -n kong --values k8s/values.yaml \
-            --set env.plugins="bundled,openid-connect" --wait
+            --set env.plugins="bundled\,openid-connect" --wait
 
           echo "Checking if openid-connect plugin is enabled..."
           kubectl get pods -n kong
