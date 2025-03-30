@@ -56,41 +56,26 @@ jobs:
       - name: Setup kubectl
         run: |
           az aks get-credentials --resource-group kong-ai-gateway --name kong-aks
-
       - name: Get AOAI Credentials and Create Secret
         run: |
-          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test8 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
-          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test8 -g kong-ai-gateway --query 'key1' -o tsv)
-
+          AOAI_ENDPOINT=$(az cognitiveservices account show -n kong-aoai-test9 -g kong-ai-gateway --query 'properties.endpoint' -o tsv)
+          AOAI_KEY=$(az cognitiveservices account keys list -n kong-aoai-test9 -g kong-ai-gateway --query 'key1' -o tsv)
           kubectl create secret generic aoai --from-literal=OPENAI_API_KEY=$AOAI_KEY --from-literal=OPENAI_ENDPOINT=https://openai-internal-service || true
-
       - name: Ensure TLS Certificates Exist
         run: |
           if [[ ! -f ./tls.crt || ! -f ./tls.key ]]; then
             echo "TLS certificate files not found! Generating self-signed certificate..."
             openssl req -x509 -newkey rsa:4096 -keyout tls.key -out tls.crt -days 365 -nodes -subj "/CN=kong-ai-gateway"
           fi
-
       - name: Deploy Kong
         run: |
           kubectl create namespace kong || true
           helm repo add kong https://charts.konghq.com
           helm repo update
-          
           kubectl create secret tls konnect-client-tls -n kong \
             --cert=./tls.crt --key=./tls.key
-
           echo "Installing Kong..."
-          helm upgrade --install kong kong/ingress -n kong --values k8s/values.yaml \
-            --set env.plugins="bundled\,openid-connect" --wait --force
-
-          echo "Waiting for Kong to be fully ready..."
-          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kong -n kong --timeout=120s
-
-          echo "Checking if openid-connect plugin is enabled..."
-          kubectl get pods -n kong
-          kubectl get pods -n kong -l app.kubernetes.io/name=kong -o name | head -n 1 | xargs kubectl exec -n kong -it -- kong config db_export | grep openid-connect || echo "OIDC plugin not enabled!"
-
+          helm upgrade --install kong kong/ingress -n kong --values k8s/values.yaml --wait
       - name: Debug Kong Installation
         run: |
           echo "Checking Kong resources..."
@@ -99,7 +84,6 @@ jobs:
           kubectl describe svc -n kong kong-gateway-proxy || echo "kong-gateway-proxy service not found!"
           echo "Fetching Kong logs..."
           kubectl logs -n kong -l app.kubernetes.io/name=kong --tail=50 || echo "No logs found!"
-
       - name: Wait for Kong External IP
         run: |
           echo "Waiting for Kong external IP..."
@@ -107,27 +91,21 @@ jobs:
             echo "Waiting for external IP..."
             sleep 30
           done
-
           KONG_EXTERNAL_IP=$(kubectl get svc -n kong -o jsonpath='{.items[?(@.metadata.name=="kong-gateway-proxy")].status.loadBalancer.ingress[0].ip}')
           echo "Kong External IP: $KONG_EXTERNAL_IP"
-
           # Update kong-plugin-oidc-test.yaml with correct External IP
           sed -i "s|https://<KONG EXTERNAL IP>.nip.io/|https://$KONG_EXTERNAL_IP.nip.io/|g" k8s/kong-plugin-oidc-test.yaml
-
           # Update ingress-web.yaml with correct External IP
           sed -i "s|<KONG EXTERNAL IP>.nip.io|$KONG_EXTERNAL_IP.nip.io|g" k8s/ingress-web.yaml
-
       - name: Deploy Cert Manager
         run: |
           kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.4/cert-manager.yaml
-
       - name: Apply Kubernetes Resources
         run: |
           kubectl apply -f k8s/kong-plugin-oidc-test.yaml
           kubectl apply -f k8s/ingress-web.yaml
           kubectl apply -f k8s/kong-plugin-rate-limit.yaml
           kubectl apply -f k8s/ingress-openai.yaml
-
   TerraformDestroy:
     name: "Terraform Destroy"
     needs: [terraform, kubernetes]
